@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Bluetooth</string>
+    <string name="hardware_issue">Bluetooth NOT Supported</string>
+    <string name="enable_bt">Need Bluetooth Enabled</string>
+    <string name="no_device">NO device connected</string>
+    <string name="auth_fail">Authentication FAILED</string>
+    <string name="auth_succeed">Authentication Passed</string>
+    <string name="button_encrypt">Encrypt1</string>
+    <string name="button_decrypt">Encrypt2</string>
+
+</resources>
