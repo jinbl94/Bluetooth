@@ -26,7 +26,7 @@ import java.util.UUID;
 
 public class Bluetooth{
 
-    private String TAG = "BLUETOOTH_CLASS";
+    private String TAG = "Bluetooth";
     private Activity mainActivity;
     private BluetoothAdapter mBluetoothAdapter;
 
@@ -47,6 +47,8 @@ public class Bluetooth{
     private String mAuthCode = null;
     private String mPrivateKey = null;
     private String mPublicKey = null;
+
+    private List<String[]> devices = new ArrayList<>();
 
     public Bluetooth(Activity activity){
         mainActivity = activity;
@@ -75,7 +77,6 @@ public class Bluetooth{
 
         int number = pairedDevices.size();
         if (number > 0){
-            List<String[]> devices = new ArrayList<>();
             String deviceNameAddress[] = new String[2];
 
             for (BluetoothDevice device : pairedDevices){
@@ -89,6 +90,48 @@ public class Bluetooth{
             // No devices connected
             utils.popup(mainActivity, mainActivity.getResources().getString(R.string.no_device));
             return null;
+        }
+    }
+
+    // Initial bluetooth socket with specific device
+    public void ConnectWithPeer(String address){
+        // Get bluetooth device from device address
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+        BluetoothSocket socket = null;
+        UUID DEFAULT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+
+        try {
+            // Get a BluetoothSocket to connect with the given BluetoothDevice
+            socket = device.createRfcommSocketToServiceRecord(DEFAULT_UUID);
+        } catch (IOException e) {
+            Log.e(TAG, "Socket's create() method failed", e);
+        }
+
+        // Initial input and output stream
+        try {
+            // Connect to the remote device through the socket. This call blocks
+            // until it succeeds or throws an exception.
+            socket.connect();
+        } catch (IOException connectException) {
+            // Unable to connect; close the socket and return.
+            try {
+                socket.close();
+            } catch (IOException closeException) {
+                Log.e(TAG, "Could not close the client socket", closeException);
+            }
+        }
+
+        // Get the input and output streams; using temp objects because
+        // member streams are final.
+        try {
+            mInputStream = socket.getInputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating input stream", e);
+        }
+        try {
+            mOutputStream = socket.getOutputStream();
+        } catch (IOException e) {
+            Log.e(TAG, "Error occurred when creating output stream", e);
         }
     }
 
@@ -178,55 +221,6 @@ public class Bluetooth{
         }
     }
 
-    // Initial bluetooth socket with specific device
-    private void ConnectWithPeer(String address){
-        // Get bluetooth device from device address
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
-        BluetoothSocket socket = null;
-        UUID DEFAULT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
-
-        try {
-            // Get a BluetoothSocket to connect with the given BluetoothDevice
-            socket = device.createRfcommSocketToServiceRecord(device.getUuids()[0].getUuid());
-        } catch (NullPointerException e) {
-            Log.d(TAG, " UUID from device is null, Using Default UUID, Device name: " + device.getName());
-            try {
-                socket = device.createRfcommSocketToServiceRecord(DEFAULT_UUID);
-            } catch (IOException e1) {
-                e1.printStackTrace();
-            }
-        } catch (IOException e) {
-            Log.e(TAG, "Socket's create() method failed", e);
-        }
-
-        // Initial input and output stream
-        try {
-            // Connect to the remote device through the socket. This call blocks
-            // until it succeeds or throws an exception.
-            socket.connect();
-        } catch (IOException connectException) {
-            // Unable to connect; close the socket and return.
-            try {
-                socket.close();
-            } catch (IOException closeException) {
-                Log.e(TAG, "Could not close the client socket", closeException);
-            }
-        }
-
-        // Get the input and output streams; using temp objects because
-        // member streams are final.
-        try {
-            mInputStream = socket.getInputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating input stream", e);
-        }
-        try {
-            mOutputStream = socket.getOutputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating output stream", e);
-        }
-    }
-
     // Details of authentication
     /*
     This procedure has several steps.
@@ -244,10 +238,10 @@ public class Bluetooth{
 
         // initialize RSA with saved keypair
         // "Decrypt" message with private key, namely signature
-        RSA mRSA = new RSA();
+        // RSA mRSA = new RSA();
         LoadMessage();
         try {
-            mRSA.SetPrivateKey(mPrivateKey);
+            //mRSA.SetPrivateKey(mPrivateKey);
         } catch (Exception e){
             Log.e(TAG, "Set RSA private key error", e);
         }
@@ -255,7 +249,7 @@ public class Bluetooth{
         // "Encrypt authCode"
         String encCode = null;
         try {
-            encCode = mRSA.Decrypt(mAuthCode);
+            //encCode = mRSA.Decrypt(mAuthCode);
         } catch (Exception e) {
             Log.e(TAG, "RSA decrypt error", e);
         }
