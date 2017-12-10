@@ -4,14 +4,14 @@ import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.widget.TextView;
-
-import java.util.List;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
 
 public class MainActivity extends AppCompatActivity {
 
     Bluetooth mBlutooth;
-    TextView textM, textC1, textC2;
+    ListView mListView;
 
     private final static String TAG = "MainActivity";
 
@@ -24,20 +24,36 @@ public class MainActivity extends AppCompatActivity {
 
         mBlutooth.CheckHardware();
 
-//        textM = findViewById(R.id.text_m);
-//        textC1 = findViewById(R.id.text_c1);
-//        textC2 = findViewById(R.id.text_c2);
+        mListView = findViewById(R.id.device_list);
     }
 
-    public void onEncrypt(View view){
-        Log.d(TAG, "Encrypt");
-
-        List<String[]> devices = mBlutooth.Devices();
-        mBlutooth.ConnectWithPeer(devices.get(0)[1]);
-        mBlutooth.write("hello tang");
+    public void onRefresh(View view){
+        refreshList();
     }
 
-    public void onDecrypt(View view){
+    private void refreshList(){
+        final String[] devices = mBlutooth.Devices();
 
+        if (devices == null){
+            utils.popup(this, getResources().getString(R.string.no_device));
+        } else {
+
+            mListView.setAdapter(
+                    new ArrayAdapter<>(this,
+                            android.R.layout.simple_list_item_1,
+                            devices)
+            );
+
+            mListView.setOnItemClickListener(
+                    new AdapterView.OnItemClickListener() {
+                        @Override
+                        public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+//                        String address = devices.get(position)[1];
+//                        mBlutooth.Authenticate(address);
+                            Log.d(TAG, "clicked " + position);
+                        }
+                    }
+            );
+        }
     }
 }

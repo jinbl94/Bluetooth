@@ -5,7 +5,11 @@
     <string name="no_device">NO device connected</string>
     <string name="auth_fail">Authentication FAILED</string>
     <string name="auth_succeed">Authentication Passed</string>
-    <string name="button_encrypt">Encrypt1</string>
-    <string name="button_decrypt">Encrypt2</string>
+    <string name="button_refresh">Refresh</string>
+    <string name="secure_core_failed">Connect secure core failed</string>
+    <string name="public_key_failed">Failed to get public key</string>
+    <string name="signature_failed">Failed to sign message</string>
+    <string name="unlock_failed">Signature verification failed</string>
+    <string name="unknown_code">Code unknown</string>
 
 </resources>
