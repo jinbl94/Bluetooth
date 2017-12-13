@@ -37,6 +37,8 @@ public class Bluetooth{
 
     private Crypto mCrypto=Crypto.getInstance();
 
+    private List<String> devicesAddress;
+
     public Bluetooth(Activity activity){
         mainActivity = activity;
         mBluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
@@ -63,15 +65,15 @@ public class Bluetooth{
 
         int number = pairedDevices.size();
         if (number > 0){
-            List<String> devices = new ArrayList<>();
-            String deviceNameAddress;
+            devicesAddress = new ArrayList<>();
+            List<String> deviceName = new ArrayList<>();
 
             for (BluetoothDevice device : pairedDevices){
-                deviceNameAddress = device.getName() + " MAC:" +device.getAddress();
-                devices.add(deviceNameAddress);
+                devicesAddress.add(device.getAddress());
+                deviceName.add(device.getName());
             }
 
-            return devices.toArray(new String[number]);
+            return deviceName.toArray(new String[0]);
         } else {
             // No devices connected
             return null;
@@ -122,17 +124,7 @@ public class Bluetooth{
 
     // Authentication framework, which contains request socket from the system
     // and exchange authentication data with peer.
-    public boolean Authenticate(String address){
-        // Cancel discovery because it otherwise slows down the connection
-        mBluetoothAdapter.cancelDiscovery();
-        // Check connection
-        ConnectWithPeer(address);
-        boolean statu = shakeHand();
-        if (statu){
-            utils.popup(mainActivity,mainActivity.getResources().getString(R.string.auth_fail));
-            return statu;
-        }
-
+    public boolean Authenticate(int position){
         // Check secure core
         if(!mCrypto.ConnectSecureCore(mainActivity)){
             utils.popup(mainActivity, mainActivity.getResources().getString(R.string.secure_core_failed));
@@ -140,6 +132,16 @@ public class Bluetooth{
         } else if(!mCrypto.isReady()){
             utils.popup(mainActivity, mainActivity.getResources().getString(R.string.secure_core_failed));
             return true;
+        }
+
+        // Cancel discovery because it otherwise slows down the connection
+        mBluetoothAdapter.cancelDiscovery();
+        // Check connection
+        ConnectWithPeer(devicesAddress.get(position));
+        boolean statu = shakeHand();
+        if (statu){
+            utils.popup(mainActivity,mainActivity.getResources().getString(R.string.auth_fail));
+            return statu;
         }
 
         // Get public key from secure core

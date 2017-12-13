@@ -10,8 +10,8 @@ import android.widget.ListView;
 
 public class MainActivity extends AppCompatActivity {
 
-    Bluetooth mBlutooth;
-    ListView mListView;
+    private Bluetooth mBlutooth;
+    private ListView mListView;
 
     private final static String TAG = "MainActivity";
 
@@ -25,6 +25,8 @@ public class MainActivity extends AppCompatActivity {
         mBlutooth.CheckHardware();
 
         mListView = findViewById(R.id.device_list);
+
+        refreshList();
     }
 
     public void onRefresh(View view){
@@ -48,12 +50,60 @@ public class MainActivity extends AppCompatActivity {
                     new AdapterView.OnItemClickListener() {
                         @Override
                         public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-//                        String address = devices.get(position)[1];
-//                        mBlutooth.Authenticate(address);
+//                        mBlutooth.Authenticate(position);
                             Log.d(TAG, "clicked " + position);
                         }
                     }
             );
         }
     }
+
+//    private Crypto mCrypto = Crypto.getInstance();
+
+//    public class SignTest implements Runnable {
+//        Crypto mCrypto;
+//        Context context;
+//        SignTest(Crypto mCrypto, Context context){
+//            this.mCrypto = mCrypto;
+//            this.context = context;
+//        }
+//
+//        @Override
+//        public void run(){
+//            //security core test
+//            // Check secure core
+//            if(!mCrypto.ConnectSecureCore(context)){
+//                Log.d(TAG, "Can't connect security core");
+//                return;
+//            } else if(!mCrypto.isReady()){
+//                Log.d(TAG, "Security core is not ready yet");
+//                return;
+//            }
+//
+//            // Get public key from secure core
+//            byte[] pubKey=mCrypto.getPublicKey();
+//            if(pubKey==null){
+//                Log.d(TAG, "Failed to get public key");
+//                return;
+//            }
+//
+//            Log.d(TAG, "Public key: "+pubKey);
+//
+//            byte[] cMessage = {1,2,3,4};
+//
+//            // Sign chalenge message
+//            byte[] sign = mCrypto.hashAndSignData(cMessage);
+//            if (sign == null){
+//                Log.d(TAG, "Signature generating failed");
+//                return;
+//            }
+//
+//            Log.d(TAG, "Signature: "+sign);
+//
+//            long result = mCrypto.hashAndVerifyData(cMessage, sign);
+//
+//            Log.d(TAG, "Signature verification result: "+result);
+//        }
+//    }
+
 }
