@@ -10,6 +10,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -23,21 +24,27 @@ import iie.dcs.crypto.Crypto;
 
 public class Bluetooth{
 
-    private String TAG = "Bluetooth";
+    // External varies
     private Activity mainActivity;
-    private BluetoothAdapter mBluetoothAdapter;
+    private Crypto mCrypto=Crypto.getInstance();
 
+    // Bluetooth varies
+    private String TAG = "Bluetooth";
+    private BluetoothAdapter mBluetoothAdapter;
+    private List<String> devicesAddress;
+
+    // Message code
     private final static String CLIENT_HI = "0";
     private final static String SERVER_HI = "1";
     private final static String SERVER_SUCC = "2";
-    private final static String SERVER_FAIL = "3";
-    
+
+    // Socket input and output
     private InputStream mInputStream = null;
     private OutputStream mOutputStream = null;
+    private BluetoothSocket mSocket = null;
 
-    private Crypto mCrypto=Crypto.getInstance();
-
-    private List<String> devicesAddress;
+    // Socket status
+    private int currentDevice = 0;
 
     public Bluetooth(Activity activity){
         mainActivity = activity;
@@ -45,7 +52,7 @@ public class Bluetooth{
     }
 
     //check if the device support bluetooth
-    public void CheckHardware(){
+    void CheckHardware(){
         if (mBluetoothAdapter == null ){
             // Device does not support Bluetooth, exit this App
             utils.popup(mainActivity, mainActivity.getResources().getString(R.string.hardware_issue));
@@ -60,7 +67,7 @@ public class Bluetooth{
     }
 
     // Get the list of connected devices
-    public String[] Devices(){
+    String[] Devices(){
         Set<BluetoothDevice> pairedDevices= mBluetoothAdapter.getBondedDevices();
 
         int number = pairedDevices.size();
@@ -81,119 +88,129 @@ public class Bluetooth{
     }
 
     // Initial bluetooth socket with specific device
-    public void ConnectWithPeer(String address){
-        // Get bluetooth device from device address
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
-        BluetoothSocket socket = null;
-        UUID DEFAULT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private void ConnectWithPeer(int position){
+        if (currentDevice != position){
+            currentDevice = position;
+            // Get bluetooth device from device address
+            BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(devicesAddress.get(position));
+            UUID DEFAULT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
-        try {
-            // Get a BluetoothSocket to connect with the given BluetoothDevice
-            socket = device.createRfcommSocketToServiceRecord(DEFAULT_UUID);
-        } catch (IOException e) {
-            Log.e(TAG, "Socket's create() method failed", e);
-        }
-
-        // Initial input and output stream
-        try {
-            // Connect to the remote device through the socket. This call blocks
-            // until it succeeds or throws an exception.
-            socket.connect();
-        } catch (IOException connectException) {
-            // Unable to connect; close the socket and return.
             try {
-                socket.close();
-            } catch (IOException closeException) {
-                Log.e(TAG, "Could not close the client socket", closeException);
+                // Get a BluetoothSocket to connect with the given BluetoothDevice
+                mSocket = device.createRfcommSocketToServiceRecord(DEFAULT_UUID);
+            } catch (IOException e) {
+                // Log.e(TAG, "Socket's create() method failed", e);
+            }
+
+            // Initial input and output stream
+            try {
+                // Connect to the remote device through the socket. This call blocks
+                // until it succeeds or throws an exception.
+                mSocket.connect();
+            } catch (IOException connectException) {
+                // Unable to connect; close the socket and return.
+                try {
+                    mSocket.close();
+                } catch (IOException closeException) {
+                    // Log.e(TAG, "Could not close the client socket", closeException);
+                }
+            }
+
+            // Get the input and output streams; using temp objects because
+            // member streams are final.
+            try {
+                mInputStream = mSocket.getInputStream();
+            } catch (IOException e) {
+                // Log.e(TAG, "Error occurred when creating input stream", e);
+            }
+            try {
+                mOutputStream = mSocket.getOutputStream();
+            } catch (IOException e) {
+                // Log.e(TAG, "Error occurred when creating output stream", e);
             }
         }
+    }
 
-        // Get the input and output streams; using temp objects because
-        // member streams are final.
-        try {
-            mInputStream = socket.getInputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating input stream", e);
-        }
-        try {
-            mOutputStream = socket.getOutputStream();
-        } catch (IOException e) {
-            Log.e(TAG, "Error occurred when creating output stream", e);
+    void Authenticate(int position){
+        // Cancel discovery, and connect with the specific device
+        mBluetoothAdapter.cancelDiscovery();
+        ConnectWithPeer(position);
+
+        boolean result = DoAuthenticate();
+
+        // Log.d(TAG, "authentication result: "+result);
+        if(result){
+            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.auth_fail));
+        } else {
+            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.auth_succeed));
         }
     }
 
     // Authentication framework, which contains request socket from the system
     // and exchange authentication data with peer.
-    public boolean Authenticate(int position){
+    private boolean DoAuthenticate(){
+        // Check socket connection
+        if ( shakeHand() ){
+            // Log.d(TAG, "shake hand error");
+            return true;
+        }
+
         // Check secure core
         if(!mCrypto.ConnectSecureCore(mainActivity)){
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.secure_core_failed));
+            // Log.d(TAG, "connecting secure core failed");
             return true;
         } else if(!mCrypto.isReady()){
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.secure_core_failed));
+            // Log.d(TAG, "secure core is not ready");
             return true;
         }
 
-        // Cancel discovery because it otherwise slows down the connection
-        mBluetoothAdapter.cancelDiscovery();
-        // Check connection
-        ConnectWithPeer(devicesAddress.get(position));
-        boolean statu = shakeHand();
-        if (statu){
-            utils.popup(mainActivity,mainActivity.getResources().getString(R.string.auth_fail));
-            return statu;
-        }
-
-        // Get public key from secure core
+        // Get public key from secure core, and send it to pc
         byte[] pubKey=mCrypto.getPublicKey();
+        // Log.d(TAG, "pubKey: "+new BigInteger(pubKey).toString(16));
         if(pubKey==null){
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.public_key_failed));
+            // Log.d(TAG, "can't get public key");
             return true;
         }
-        // Send public key to server
         write(pubKey);
 
-        // Receive chanlenge message
+        // Receive challenge message
         byte[] cMessage = read();
-
-        // Sign chalenge message
+        // Log.d(TAG, "cMessage: "+new String(cMessage).replace("\0", ""));
+        // Sign the message, and send signature to peer
         byte[] sign = mCrypto.hashAndSignData(cMessage);
+        // Log.d(TAG, "sign: "+new BigInteger(sign).toString(16));
         if (sign == null){
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.signature_failed));
+            // Log.d(TAG, "signature failed");
             return true;
         }
-
-        // Send signature to server
         write(sign);
 
-        // Check result from pc
-        byte[] pcResult = read();
-        if (pcResult.toString().equals(SERVER_SUCC)){
-            return false;
-        } else if(pcResult.toString().equals(SERVER_FAIL)) {
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.unlock_failed));
+        byte[] code = read();
+        if (code == null){
+            // Log.d(TAG, "Empty code");
             return true;
         } else {
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.unknown_code));
-            return true;
+            // Check authentication result, if it equals "2" return false, otherwise, true.
+            String pcResult = new String(code).replace("\0", "");
+            // Log.d(TAG, "pcResult: "+new String(pcResult).replace("\0", ""));
+            return !pcResult.equals(SERVER_SUCC);
         }
     }
 
     // Shake hands with peer
     private boolean shakeHand(){
         // Use this buffer to point to received data
-        String mBuffer;
-
+        byte[] data;
         // Shake hands with server
         write(CLIENT_HI.getBytes());
-        mBuffer = read().toString();
-
-        // todo: the format of bytes receive from server is uncertain, this codes need further modify
-        if (mBuffer != SERVER_HI){
+        data = read();
+        if (data == null){
+            // Log.d(TAG, "no shake hand data received");
             return true;
+        } else {
+            String pcCode = new String(data).replace("\0", "");
+            return !pcCode.equals(SERVER_HI);
         }
-        
-        return false;
     }
 
     // write bytes to peer
@@ -201,22 +218,21 @@ public class Bluetooth{
         try {
             mOutputStream.write(bytes);
         } catch (IOException e) {
-            Log.e(TAG, "Error occurred when sending data", e);
+            // Log.e(TAG, "Error sending data", e);
         }
     }
 
     // read bytes from peer
-    public byte[] read() {
+    private byte[] read() {
         byte[] buffer = new byte[1024];
-
         try {
             // Read from the InputStream.
-            mInputStream.read(buffer);
+            int length = mInputStream.read(buffer);
+            // Log.d(TAG, "Data length: "+length);
             return buffer;
         } catch (IOException e) {
-            Log.d(TAG, "Input stream was disconnected", e);
+            // Log.d(TAG, "Error reading data", e);
+            return null;
         }
-
-        return null;
     }
 }

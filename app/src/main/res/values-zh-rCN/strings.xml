@@ -3,10 +3,8 @@
     <string name="app_name">蓝牙</string>
     <string name="hardware_issue">设备不支持蓝牙</string>
     <string name="enable_bt">请打开蓝牙</string>
-    <string name="no_device">无已连接设备！</string>
+    <string name="no_device">无已连接设备</string>
     <string name="auth_fail">认证失败</string>
     <string name="auth_succeed">认证成功</string>
-    <string name="button_encrypt">加密1</string>
-    <string name="button_decrypt">加密2</string>
-
+    <string name="button_refresh">刷新</string>
 </resources>
