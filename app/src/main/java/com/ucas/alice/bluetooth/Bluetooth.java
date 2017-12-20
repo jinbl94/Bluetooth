@@ -44,7 +44,7 @@ public class Bluetooth{
     private BluetoothSocket mSocket = null;
 
     // Socket status
-    private int currentDevice = 0;
+    private int currentDevice = -1;
 
     public Bluetooth(Activity activity){
         mainActivity = activity;
@@ -135,8 +135,13 @@ public class Bluetooth{
         // Cancel discovery, and connect with the specific device
         mBluetoothAdapter.cancelDiscovery();
         ConnectWithPeer(position);
-
-        boolean result = DoAuthenticate();
+        boolean result;
+        if (mInputStream == null || mOutputStream == null){
+            Log.d(TAG, "input output stream null");
+            result =true;
+        } else {
+            result = DoAuthenticate();
+        }
 
         // Log.d(TAG, "authentication result: "+result);
         if(result){
@@ -166,18 +171,23 @@ public class Bluetooth{
 
         // Get public key from secure core, and send it to pc
         byte[] pubKey=mCrypto.getPublicKey();
-        // Log.d(TAG, "pubKey: "+new BigInteger(pubKey).toString(16));
         if(pubKey==null){
             // Log.d(TAG, "can't get public key");
             return true;
         }
+        // Log.d(TAG, "pubKey: "+new BigInteger(pubKey).toString(16));
         write(pubKey);
 
         // Receive challenge message
-        byte[] cMessage = read();
+        byte[] bitMessage = read();
+        if (bitMessage == null){
+            // Log.d(TAG, "Challenge data empty");
+            return true;
+        }
+        String strMessage = new String(bitMessage).replace("\0", "");
         // Log.d(TAG, "cMessage: "+new String(cMessage).replace("\0", ""));
         // Sign the message, and send signature to peer
-        byte[] sign = mCrypto.hashAndSignData(cMessage);
+        byte[] sign = mCrypto.hashAndSignData(strMessage.getBytes());
         // Log.d(TAG, "sign: "+new BigInteger(sign).toString(16));
         if (sign == null){
             // Log.d(TAG, "signature failed");
