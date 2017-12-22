@@ -10,7 +10,6 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -99,7 +98,7 @@ public class Bluetooth{
                 // Get a BluetoothSocket to connect with the given BluetoothDevice
                 mSocket = device.createRfcommSocketToServiceRecord(DEFAULT_UUID);
             } catch (IOException e) {
-                // Log.e(TAG, "Socket's create() method failed", e);
+                Log.e(TAG, "Socket's create() method failed", e);
             }
 
             // Initial input and output stream
@@ -109,10 +108,11 @@ public class Bluetooth{
                 mSocket.connect();
             } catch (IOException connectException) {
                 // Unable to connect; close the socket and return.
+                Log.e(TAG, "Failed to connect server", connectException);
                 try {
                     mSocket.close();
                 } catch (IOException closeException) {
-                    // Log.e(TAG, "Could not close the client socket", closeException);
+                    Log.e(TAG, "Could not close the client socket", closeException);
                 }
             }
 
@@ -121,17 +121,17 @@ public class Bluetooth{
             try {
                 mInputStream = mSocket.getInputStream();
             } catch (IOException e) {
-                // Log.e(TAG, "Error occurred when creating input stream", e);
+                Log.e(TAG, "Input stream null", e);
             }
             try {
                 mOutputStream = mSocket.getOutputStream();
             } catch (IOException e) {
-                // Log.e(TAG, "Error occurred when creating output stream", e);
+                Log.e(TAG, "Output stream null", e);
             }
         }
     }
 
-    void Authenticate(int position){
+    boolean Authenticate(int position){
         // Cancel discovery, and connect with the specific device
         mBluetoothAdapter.cancelDiscovery();
         ConnectWithPeer(position);
@@ -142,13 +142,7 @@ public class Bluetooth{
         } else {
             result = DoAuthenticate();
         }
-
-        // Log.d(TAG, "authentication result: "+result);
-        if(result){
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.auth_fail));
-        } else {
-            utils.popup(mainActivity, mainActivity.getResources().getString(R.string.auth_succeed));
-        }
+        return result;
     }
 
     // Authentication framework, which contains request socket from the system
@@ -156,70 +150,61 @@ public class Bluetooth{
     private boolean DoAuthenticate(){
         // Check socket connection
         if ( shakeHand() ){
-            // Log.d(TAG, "shake hand error");
+            Log.d(TAG, "shake hand error");
             return true;
         }
 
         // Check secure core
         if(!mCrypto.ConnectSecureCore(mainActivity)){
-            // Log.d(TAG, "connecting secure core failed");
+            Log.d(TAG, "connecting secure core failed");
             return true;
         } else if(!mCrypto.isReady()){
-            // Log.d(TAG, "secure core is not ready");
+            Log.d(TAG, "secure core is not ready");
             return true;
         }
 
         // Get public key from secure core, and send it to pc
         byte[] pubKey=mCrypto.getPublicKey();
         if(pubKey==null){
-            // Log.d(TAG, "can't get public key");
+            Log.d(TAG, "public key null");
             return true;
         }
-        // Log.d(TAG, "pubKey: "+new BigInteger(pubKey).toString(16));
         write(pubKey);
 
         // Receive challenge message
-        byte[] bitMessage = read();
-        if (bitMessage == null){
+        String serverMessage = read();
+        if (serverMessage == null){
             // Log.d(TAG, "Challenge data empty");
             return true;
         }
-        String strMessage = new String(bitMessage).replace("\0", "");
-        // Log.d(TAG, "cMessage: "+new String(cMessage).replace("\0", ""));
         // Sign the message, and send signature to peer
-        byte[] sign = mCrypto.hashAndSignData(strMessage.getBytes());
-        // Log.d(TAG, "sign: "+new BigInteger(sign).toString(16));
+        byte[] sign = mCrypto.hashAndSignData(serverMessage.getBytes());
         if (sign == null){
-            // Log.d(TAG, "signature failed");
+            Log.d(TAG, "signature failed");
             return true;
         }
         write(sign);
 
-        byte[] code = read();
-        if (code == null){
-            // Log.d(TAG, "Empty code");
+        String serverResult = read();
+        if (serverResult == null){
+            Log.d(TAG, "result code null");
             return true;
         } else {
             // Check authentication result, if it equals "2" return false, otherwise, true.
-            String pcResult = new String(code).replace("\0", "");
-            // Log.d(TAG, "pcResult: "+new String(pcResult).replace("\0", ""));
-            return !pcResult.equals(SERVER_SUCC);
+            return !serverResult.equals(SERVER_SUCC);
         }
     }
 
     // Shake hands with peer
     private boolean shakeHand(){
-        // Use this buffer to point to received data
-        byte[] data;
         // Shake hands with server
         write(CLIENT_HI.getBytes());
-        data = read();
-        if (data == null){
-            // Log.d(TAG, "no shake hand data received");
+        String serverHI = read();
+        if (serverHI == null){
+            Log.d(TAG, "serverHI null");
             return true;
         } else {
-            String pcCode = new String(data).replace("\0", "");
-            return !pcCode.equals(SERVER_HI);
+            return !serverHI.equals(SERVER_HI);
         }
     }
 
@@ -233,15 +218,16 @@ public class Bluetooth{
     }
 
     // read bytes from peer
-    private byte[] read() {
+    private String read() {
         byte[] buffer = new byte[1024];
         try {
             // Read from the InputStream.
             int length = mInputStream.read(buffer);
-            // Log.d(TAG, "Data length: "+length);
-            return buffer;
+            String data = new String(buffer).replace("\0", "");
+            Log.d(TAG, "Data("+length+"): "+data);
+            return data;
         } catch (IOException e) {
-            // Log.d(TAG, "Error reading data", e);
+            Log.d(TAG, "Error reading data", e);
             return null;
         }
     }
